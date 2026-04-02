@@ -15,7 +15,7 @@ async function handleEvent(event) {
 
   try {
     // 尝试最经典的路径：v1beta + gemini-pro
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const geminiRes = await fetch(geminiUrl, {
       method: "POST",
