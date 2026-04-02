@@ -9,32 +9,39 @@ export default async function handler(req, res) {
     if (event.type === "message" && event.message.type === "text") {
       const userMessage = event.message.text;
 
-      // 👉 调用 Gemini
-      const geminiRes = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
-          process.env.GEMINI_API_KEY,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: userMessage }],
-              },
-            ],
-          }),
-        }
-      );
+      let replyText = "";
 
-      const geminiData = await geminiRes.json();
+      try {
+        const geminiRes = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
+            process.env.GEMINI_API_KEY,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [{ text: userMessage }],
+                },
+              ],
+            }),
+          }
+        );
 
-      const replyText =
-        geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "抱歉，我暂时无法回答 😢";
+        const data = await geminiRes.json();
 
-      // 👉 回复 LINE
+        console.log("Gemini返回:", JSON.stringify(data));
+
+        replyText =
+          data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+          "AI没有返回内容 😢";
+      } catch (err) {
+        console.log("Gemini错误:", err);
+        replyText = "AI调用失败 ❌";
+      }
+
       await fetch("https://api.line.me/v2/bot/message/reply", {
         method: "POST",
         headers: {
