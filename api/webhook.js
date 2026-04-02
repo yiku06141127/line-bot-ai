@@ -13,8 +13,7 @@ export default async function handler(req, res) {
 
       try {
         const geminiRes = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
-            process.env.GEMINI_API_KEY,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
           {
             method: "POST",
             headers: {
@@ -23,7 +22,12 @@ export default async function handler(req, res) {
             body: JSON.stringify({
               contents: [
                 {
-                  parts: [{ text: userMessage }],
+                  role: "user",
+                  parts: [
+                    {
+                      text: userMessage,
+                    },
+                  ],
                 },
               ],
             }),
@@ -35,10 +39,15 @@ export default async function handler(req, res) {
         console.log("Gemini返回:", JSON.stringify(data));
 
         replyText =
-          data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-          "AI没有返回内容 😢";
+          data.candidates &&
+          data.candidates[0] &&
+          data.candidates[0].content &&
+          data.candidates[0].content.parts &&
+          data.candidates[0].content.parts[0].text
+            ? data.candidates[0].content.parts[0].text
+            : "AI没有返回内容 😢";
       } catch (err) {
-        console.log("Gemini错误:", err);
+        console.log("错误:", err);
         replyText = "AI调用失败 ❌";
       }
 
