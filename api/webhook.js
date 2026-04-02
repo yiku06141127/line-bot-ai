@@ -1,25 +1,25 @@
 export default async function handler(req, res) {
-  // 1. 只处理 POST 请求
+  // 1. 基础校验：只允许 POST 请求
   if (req.method !== "POST") {
     return res.status(200).send("OK");
   }
 
   const events = req.body.events;
 
-  // 2. 并行执行所有消息处理
+  // 2. 并行处理消息流
   try {
-    // 使用 Promise.all 让所有消息同时处理，提高响应速度
+    // 即使只有一个事件，用 Promise.all 也是更规范的写法
     await Promise.all(events.map(event => handleEvent(event)));
   } catch (err) {
     console.error("处理事件流时发生严重错误:", err);
   }
 
-  // 3. 必须立即给 LINE 回应 200，否则 LINE 会一直重发请求
+  // 3. 必须立即给 LINE 回应 200，否则 LINE 会认为请求失败而不断重试
   return res.status(200).send("OK");
 }
 
 async function handleEvent(event) {
-  // 过滤：只处理“文字消息”
+  // 过滤：仅处理“文字消息”
   if (event.type !== "message" || event.message.type !== "text") {
     return null;
   }
@@ -29,52 +29,50 @@ async function handleEvent(event) {
   let replyText = "";
 
   try {
-    // 调用 Gemini API
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: userMessage }]
-            }
-          ],
-          // 添加安全设置，防止 AI 因为敏感度太高而不说话
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-          ]
-        })
-      }
-    );
+    // 【关键修改点】使用了 v1 稳定版接口路径
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+
+    const geminiRes = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: userMessage }]
+          }
+        ],
+        // 安全设置：确保 AI 不会因为过于敏感而拒答
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
+      })
+    });
 
     const data = await geminiRes.json();
 
-    // 【重要】打印日志，如果还是“没有想法”，请去 Vercel Logs 看这里的输出
+    // 在控制台打印完整的 API 返回结果，方便在 Vercel Logs 中排查
     console.log("Gemini API 返回详情:", JSON.stringify(data));
 
-    // 解析逻辑：逐层检查数据是否存在
+    // 严谨的解析逻辑
     if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
       replyText = data.candidates[0].content.parts[0].text;
     } else if (data.error) {
-      // 如果 API 报错（如 Key 无效或超限）
-      replyText = `API 报错了: ${data.error.message}`;
+      // 捕获 API 内部错误（如 Key 错误或参数错误）
+      replyText = `AI 接口报错: ${data.error.message}`;
     } else {
-      // 兜底回复
-      replyText = "AI 暂时无法回答这个问题，请换个问法。";
+      replyText = "AI 暂时不知道怎么回答，换个话题试试吧！";
     }
 
   } catch (err) {
     console.error("请求 Gemini 失败:", err);
-    replyText = "抱歉，我的大脑断线了 🧠⚡️";
+    replyText = "抱歉，我的网络连接出了一点点状况 🔌";
   }
 
-  // 将结果发回给 LINE
+  // 最后一步：将回复发回给 LINE 用户
   try {
     await fetch("https://api.line.me/v2/bot/message/reply", {
       method: "POST",
