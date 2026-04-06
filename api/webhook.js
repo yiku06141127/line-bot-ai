@@ -22,6 +22,7 @@ async function handleEvent(event) {
   try {
     // ✅ 使用 Gemini 2.0（你这个账号最稳定）
     // 使用 v1 稳定路径 + 去掉 -latest 后缀
+// 注意：去掉所有后缀，只保留 gemini-1.5-flash
 const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const geminiRes = await fetch(geminiUrl, {
