@@ -43,10 +43,10 @@ async function handleEvent(event) {
       replyText = data.candidates[0].content.parts[0].text;
     }
     // ❌ Gemini报错
-    else if (data.error) {
-      console.error("Gemini错误:", data);
-      replyText = "AI暂时不可用，请稍后再试";
-    }
+else if (data.error) {
+  console.error("Gemini错误:", data);
+  replyText = `错误: ${JSON.stringify(data)}`;
+}
     // ❌ 空返回
     else {
       replyText = "AI没有返回内容";
