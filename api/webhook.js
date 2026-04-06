@@ -20,12 +20,8 @@ async function handleEvent(event) {
   let replyText = "";
 
   try {
-    /**
-     * 【核心修正】
-     * 1. 路径改为 v1beta (Flash模型目前在beta路径最稳定)
-     * 2. 模型名确保为 gemini-1.5-flash
-     */
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // ✅ 使用 Gemini 2.0（你这个账号最稳定）
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const geminiRes = await fetch(geminiUrl, {
       method: "POST",
@@ -42,20 +38,26 @@ async function handleEvent(event) {
 
     const data = await geminiRes.json();
 
-    // 调试用：如果依然报错，会把具体的 JSON 结构打出来
+    // ✅ 正常返回
     if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
       replyText = data.candidates[0].content.parts[0].text;
-    } else if (data.error) {
-      replyText = `Gemini报错(${data.error.code}): ${data.error.message}`;
-    } else {
-      replyText = "AI 暂时没有返回有效内容。";
+    }
+    // ❌ Gemini报错
+    else if (data.error) {
+      console.error("Gemini错误:", data);
+      replyText = "AI暂时不可用，请稍后再试";
+    }
+    // ❌ 空返回
+    else {
+      replyText = "AI没有返回内容";
     }
 
   } catch (err) {
-    replyText = "网络连接异常，请稍后再试。";
+    console.error("请求失败:", err);
+    replyText = "网络异常，请稍后再试";
   }
 
-  // 回传给 LINE
+  // ✅ 回复 LINE
   await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",
     headers: {
@@ -64,7 +66,12 @@ async function handleEvent(event) {
     },
     body: JSON.stringify({
       replyToken: replyToken,
-      messages: [{ type: "text", text: replyText }],
+      messages: [
+        {
+          type: "text",
+          text: replyText.substring(0, 500) // 防止超长
+        }
+      ],
     }),
   });
 }
